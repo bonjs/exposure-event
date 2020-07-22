@@ -2,7 +2,8 @@
 <html>
 
 <head>
-    <title>交叉观察器</title>
+    <title></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     <style type="text/css">
         .div1 {
             height: 230px;
@@ -56,64 +57,27 @@
             };
         }();
 
-        // 获取container的scrollTop，ios下只能获取到window的pageYOffset
-        function getScrollTop(container) {
-            container = container == window ? document.body : container;
-            return container.scrollTop || window.pageYOffset;
-        }
-
+        /**
+         * 两种类型，曝光(exposure,默认), 停留(stay)
+         * 
+         */
         var Scroll = function (opt) {
 
             var me = this;
             console.log('constructor');
             var events = this.events = [];
+            this.selector = opt.selector;
 
-            var domArr = [];
+            var type = Object.prototype.toString.call(opt.type) == '[object Array]' ? opt.type : [opt.type];
 
-            var doms = document.querySelectorAll(opt.selector);
+
+            var domArr = [];    // 曝光事件使用的数组
+            var domArrStay = [];    // 停留事件使用的数组
+
+            var doms = document.querySelectorAll(this.selector);
             var visibleDoms = this.visibleDoms = [];   // 处于可见区域的dom
 
-
             var container = opt.container || doms[0] && doms[0].parentNode || window;
-
-            var observer = this.observer = new IntersectionObserver(function (entries, x) {
-                entries.forEach(function (item) {
-                    if (opt.type == 'stay') {   // 停留，停留超过一定时间才视为有效
-                        if (item.isIntersecting) {
-                            item.target.accessTime = item.time; // 展示的时候把时间记录在dom上
-                        } else {
-                            var stayTime = item.time - item.target.accessTime;  // 消失的时候计算
-                            //console.log('stayTime', stayTime)
-                        }
-                    } else {    // 曝光，只要在可视区域出现即视为曝光
-                        if (item.isIntersecting) {
-                            if (item.intersectionRatio > 0.6666666) {
-                                console.log('进入2/3', item.target, item.intersectionRatio)
-                                domArr.push(item.target)
-                            }
-                        }
-                    }
-
-                    if(item.intersectionRatio > 0.6666666) {
-                        //console.log('展示', item.target)
-                        visibleDoms.push(item.target);
-                    } else {
-                        //console.log('消失', item.target)
-                        for(var i = 0; i < visibleDoms.length; i ++) {
-                            if(visibleDoms[i] === item.target) {
-                                visibleDoms.splice(i, 1);
-                            }
-                        }
-                    }
-                });
-                // observer.disconnect() // 统计到就不在需要继续观察了
-            }, {
-                root: container,
-                threshold: [0.6666666]  // 触发时机, 2/3可见时触发
-            });
-            doms.forEach(function (item) {
-                observer.observe(item);
-            })
 
             // 初始化时设置的监听事件
             if (opt.listeners) {
@@ -122,36 +86,161 @@
                 }
             }
 
+            var actions = {
+                stay: function (item) {
+                    if (item.isIntersecting) {
+                        item.target.accessTime = item.time; // 展示的时候把时间记录在dom上
+                    } else {
+                        var stayTime = item.time - item.target.accessTime;  // 消失的时候计算
+                        if (stayTime > 3000) {
+                            //console.log('stayTime', stayTime, item.target)
+                            domArrStay.push(item.target);
+                        }
+                    }
+                },
+                exposure: function (item) {
+                    if (item.isIntersecting) {
+                        if (item.intersectionRatio > 0.6666666) {
+                            console.log('进入2/3', item.target, item.intersectionRatio)
+                            if (!domArr.some(function (it) {
+                                return it === item.target;
+                            })) {
+                                domArr.push(item.target)
+                            }
+                        }
+                    }
+                }
+            }
+
+            var isInit;
+            var observer = this.observer = new IntersectionObserver(function (entries) {
+                entries.forEach(function (item) {
+                    opt.type.forEach(function (t) {
+                        actions[t] && actions[t].call(this, item);
+                    })
+
+                    /*
+                    if (opt.type == 'stay') {   // 停留，停留超过一定时间才视为有效
+                        if (item.isIntersecting) {
+                            item.target.accessTime = item.time; // 展示的时候把时间记录在dom上
+                        } else {
+                            var stayTime = item.time - item.target.accessTime;  // 消失的时候计算
+                            if (stayTime > 3000) {
+                                //console.log('stayTime', stayTime, item.target)
+                                domArrStay.push(item.target);
+                            }
+                        }
+                    } else {    // 曝光，只要在可视区域出现即视为曝光
+                        if (item.isIntersecting) {
+                            if (item.intersectionRatio > 0.6666666) {
+                                console.log('进入2/3', item.target, item.intersectionRatio)
+                                if (!domArr.some(function (it) {
+                                    return it === item.target;
+                                })) {
+                                    domArr.push(item.target)
+                                }
+                            }
+                        }
+                    }
+                    */
+
+                    if (item.intersectionRatio > 0.6666666) {
+                        //console.log('展示', item.target)
+                        visibleDoms.push(item.target);
+                    } else {
+                        //console.log('消失', item.target)
+                        for (var i = 0; i < visibleDoms.length; i++) {
+                            if (visibleDoms[i] === item.target) {
+                                visibleDoms.splice(i, 1);
+                            }
+                        }
+                    }
+                });
+
+                clearTimeout(stayTimer);
+
+                // 初始化时触发一次stop
+                if (!isInit) {
+                    me.fireEvent('stop', domArr);
+                    isInit = true;
+                }
+                // observer.disconnect() // 统计到就不在需要继续观察了
+            }, {
+                root: container,
+                threshold: [0.6666666]  // 触发时机, 2/3可见时触发
+            });
+            doms.forEach(function (item) {
+                observer.observe(item);
+            });
+
+
+
+            var stayTimer;
+            // 停留事件，在停止滚动时setTimeout3秒后尝试发送停留事件，
+            // 如果3s内IntersectionObserver状态有改变，则清除此setTimeout
+            if (type.indexOf('stay') > -1) {
+                this.on('stop', function () {
+                    stayTimer = setTimeout(function () {
+                        visibleDoms.forEach(function (dom) {
+                            if (!domArrStay.some(function (it) {
+                                return it === dom;
+                            })) {
+                                domArrStay.push(dom);
+                            }
+                        });
+
+                        me.fireEvent('stay', domArrStay);
+                        domArrStay = [];
+                    }, 3000);
+                });
+            }
+
 
             // scroll事件主要用于兼听停止滚动时动作
             container.addEventListener('scroll', throttle(function () {
                 var scrollTop;
                 var isScroll;
-                var timer;
+                var stopTimer;
+
+                // 获取container的scrollTop，ios下只能获取到window的pageYOffset
+                function getScrollTop(container) {
+                    container = container == window ? document.body : container;
+                    return container.scrollTop || window.pageYOffset;
+                }
+
                 return function () {
                     if (!isScroll) {
                         isScroll = true;
                         domArr = [];    // 开始滚动时初始化domArr
                     }
 
-                    clearInterval(timer);
+                    clearInterval(stopTimer);
                     var oldScrollTop = getScrollTop(container);;
-                    timer = setInterval(function () {
+                    stopTimer = setInterval(function () {
                         var scrollTop = getScrollTop(container);
                         if (scrollTop == oldScrollTop) {
                             me.fireEvent('stop', domArr);
                             isScroll = false;
-                            clearInterval(timer);
+                            clearInterval(stopTimer);
                         }
                         oldScrollTop = scrollTop;
-                    }, 150);
+                    }, 300);
                 }
             }()));
         }
 
         Scroll.prototype = {
             constructor: Scroll,
-            getVisibleDoms: function() {
+            reload: function () {   // 重新读取dom(用于目标dom有变化的场合)
+                var me = this;
+                var doms = document.querySelectorAll(this.selector);
+
+                doms.forEach(function (item) {
+                    me.observer.unobserve(item);
+                    me.observer.observe(item);
+                });
+            },
+            getVisibleDoms: function () {
                 return this.visibleDoms;
             },
             // 动态添加的监听事件
@@ -181,13 +270,15 @@
 
         var s = new Scroll({
             selector: '#a .myDiv',
-            type: 'stay',
+            type: ['exposure'],
             listeners: {
-                start: function () {
-
-                },
                 stop: function (a) {
-                    //console.log('stop', a)
+                    console.log("stop", a)
+                },
+                stay: function (doms) {
+                    console.log('发送停留事件', doms.map(function (it) {
+                        return it.innerHTML;
+                    }));
                 }
             }
         });
