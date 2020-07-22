@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>交叉观察器</title>
+    <style type="text/css">
+        .div1 {
+            height: 230px;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        .div2 {
+            padding-top: 200px;
+            height: 800px;
+            background-color: #ddd;
+            overflow: hidden;
+        }
+
+        .myDiv {
+            margin-top: 50px;
+            width: 50px;
+            height: 50px;
+            background-color: pink;
+        }
+    </style>
+</head>
+
+<body>
+    <div id=a class="div1">
+        <div class="myDiv">1</div>
+        <div class="myDiv">2</div>
+        <div class="myDiv">3</div>
+        <div class="myDiv">4</div>
+        <div class="myDiv">5</div>
+        <div class="myDiv">6</div>
+        <div class="myDiv">7</div>
+        <div class="myDiv">8</div>
+        <div class="myDiv">9</div>
+        <div class="myDiv">10</div>
+        <div class="myDiv">11</div>
+        <div class="myDiv">12</div>
+    </div>
+    <script>
+        // 节流函数
+        var throttle = function () {
+            var time = 0;
+            return function (fn) {
+                return function () {
+                    var now = new Date().getTime();
+                    if (now - time > 100) {
+                        time = now;
+                        fn.apply(this, arguments)
+                    }
+                }
+            };
+        }();
+
+        // 获取container的scrollTop，ios下只能获取到window的pageYOffset
+        function getScrollTop(container) {
+            container = container == window ? document.body : container;
+            return container.scrollTop || window.pageYOffset;
+        }
+
+        var Scroll = function (opt) {
+
+            var me = this;
+            console.log('constructor');
+            var events = this.events = [];
+
+            var domArr = [];
+
+            var doms = document.querySelectorAll(opt.selector);
+            var visibleDoms = this.visibleDoms = [];   // 处于可见区域的dom
+
+
+            var container = opt.container || doms[0] && doms[0].parentNode || window;
+
+            var observer = this.observer = new IntersectionObserver(function (entries, x) {
+                entries.forEach(function (item) {
+                    if (opt.type == 'stay') {   // 停留，停留超过一定时间才视为有效
+                        if (item.isIntersecting) {
+                            item.target.accessTime = item.time; // 展示的时候把时间记录在dom上
+                        } else {
+                            var stayTime = item.time - item.target.accessTime;  // 消失的时候计算
+                            //console.log('stayTime', stayTime)
+                        }
+                    } else {    // 曝光，只要在可视区域出现即视为曝光
+                        if (item.isIntersecting) {
+                            if (item.intersectionRatio > 0.6666666) {
+                                console.log('进入2/3', item.target, item.intersectionRatio)
+                                domArr.push(item.target)
+                            }
+                        }
+                    }
+
+                    if(item.intersectionRatio > 0.6666666) {
+                        //console.log('展示', item.target)
+                        visibleDoms.push(item.target);
+                    } else {
+                        //console.log('消失', item.target)
+                        for(var i = 0; i < visibleDoms.length; i ++) {
+                            if(visibleDoms[i] === item.target) {
+                                visibleDoms.splice(i, 1);
+                            }
+                        }
+                    }
+                });
+                // observer.disconnect() // 统计到就不在需要继续观察了
+            }, {
+                root: container,
+                threshold: [0.6666666]  // 触发时机, 2/3可见时触发
+            });
+            doms.forEach(function (item) {
+                observer.observe(item);
+            })
+
+            // 初始化时设置的监听事件
+            if (opt.listeners) {
+                for (var k in opt.listeners) {
+                    this.on(k, opt.listeners[k]);
+                }
+            }
+
+
+            // scroll事件主要用于兼听停止滚动时动作
+            container.addEventListener('scroll', throttle(function () {
+                var scrollTop;
+                var isScroll;
+                var timer;
+                return function () {
+                    if (!isScroll) {
+                        isScroll = true;
+                        domArr = [];    // 开始滚动时初始化domArr
+                    }
+
+                    clearInterval(timer);
+                    var oldScrollTop = getScrollTop(container);;
+                    timer = setInterval(function () {
+                        var scrollTop = getScrollTop(container);
+                        if (scrollTop == oldScrollTop) {
+                            me.fireEvent('stop', domArr);
+                            isScroll = false;
+                            clearInterval(timer);
+                        }
+                        oldScrollTop = scrollTop;
+                    }, 150);
+                }
+            }()));
+        }
+
+        Scroll.prototype = {
+            constructor: Scroll,
+            getVisibleDoms: function() {
+                return this.visibleDoms;
+            },
+            // 动态添加的监听事件
+            on: function (eventName, eventFn) {
+                if (/^[\w-]+$/.test(eventName) && typeof eventFn == 'function') {
+                    this.events.push({
+                        name: eventName,
+                        fn: eventFn
+                    });
+                }
+            },
+            fireEvent: function (eventName) {
+                var me = this;
+                var _arguments = arguments;
+                if (eventName == undefined) {
+                    return;
+                }
+                var eventFns = this.events.filter(function (it) {
+                    return it.name == eventName;
+                });
+
+                eventFns.forEach(function (it) {
+                    it.fn && it.fn.apply(me, Array.prototype.splice.call(_arguments, 1));
+                });
+            }
+        }
+
+        var s = new Scroll({
+            selector: '#a .myDiv',
+            type: 'stay',
+            listeners: {
+                start: function () {
+
+                },
+                stop: function (a) {
+                    //console.log('stop', a)
+                }
+            }
+        });
+
+
+
+        // callback 回调函数
+        // option 配置对象
+        // var io = new IntersectionObserver(callback, option);
+
+        // 开始观察
+        // io.observe(document.getElementById('myDiv'));
+        // observe的参数是一个 DOM 节点对象。如果要观察多个节点，就要多次调用这个方法。
+
+        // // 停止观察
+        // io.unobserve(document.getElementById('myDiv'));
+
+        // // 关闭观察器
+        // io.disconnect();
+
+
+    </script>
+</body>
+
+</html>

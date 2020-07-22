@@ -1,0 +1,78 @@
+<html>
+
+<head>
+
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <style>
+        button {
+            border-radius: 3px;
+            height: 26px;
+        }
+
+        button, span {
+            display: table-cell;
+            margin: 2px 4px;
+            height: 30px;
+            line-height: 30px;
+            width: -webkit-fill-available;
+        }
+
+        .row {
+            display: table-row;
+        }
+
+        body {
+            display: table;
+        }
+    </style>
+</head>
+
+<body>
+
+
+
+</body>
+
+<script>
+
+    var data = [
+        { name: 'S8+', device: '7903c83a54d345c3aa33a4fa57e7f4e8' },
+        { name: 'iOS', device: '60b699d54b3042e6872346c34685140d' },
+        { name: '华为', device: '0a442d39468e7de021dd712a52a09c56' },
+        { name: 'vivo z5', device: 'd8640c503f34ff280001a7ff0514890a' },
+        { name: 'vivo x21a', device: 'da1b863156c05f8bdbe70969d3bea82a' },
+        { name: 'oppo a5', device: '8fa1484fabeda80c09f8f60308955f46' },
+        { name: '小米', device: '1eda44f5d28200217b25e75b4116c1b7' },
+        { name: '红米', device: 'ce09285ce3cc083e224ad06f7a5d3a38' },
+    ];
+
+    var htmlArr = [];
+
+    data.forEach(function (it) {
+        htmlArr.push([
+            '<div class="row">',
+                `<button data-device=${it.device}>${it.name}</button><span>${it.device}</span>`,
+            '</div>',
+        ].join(''))
+    });
+
+    document.body.innerHTML = htmlArr.join('');
+    document.body.addEventListener('click', async function (e) {
+        if (e.target.nodeName == 'BUTTON') {
+            var device = e.target.getAttribute('data-device')
+            var res = await fetch(`http://www.ikongji.com/test/foo_push.php?d=${device}&uid=555041&t=global_article&safecode=safecodemagic&tid=2022461`, {
+                method: 'GET',
+                headers: {
+                    'Access-Control-Allow-Origin':'*',
+                    "Content-Type":'text/html;charset=UTF-8'
+                },
+                'mode': 'no-cors'
+            });
+
+            var json = await res.text();
+            console.log(json);
+        }
+    })
+</script>
+
+</html>
