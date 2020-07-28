@@ -61,9 +61,10 @@ var Show = function (opt) {
         }
     }
 
+    // 维护三个数组domsShow，domsStay，domsVisiable的时机
     var actions = {
         stay: function (item) {         // 记录停留时的dom(enter时记录进入时间，exit时记录退出时间，判断停留时长，超过3s存入domsStay)
-            this.enterOrExit(item, {
+            enterOrExit.call(this, item, {
                 enter: function (dom) {
                     dom.accessTime = Date.now(); // 展示的时候把时间记录在dom上
                     delete dom.leftTime;
@@ -87,7 +88,7 @@ var Show = function (opt) {
             })
         },
         show: function (item) {         // 记录曝光的dom，enter添加
-            this.enterOrExit(item, {
+            enterOrExit.call(this, item, {
                 enter: function (dom) {
                     //console.log('展示', item.target, item.intersectionRatio)
                     if (!this.domsShow.some(function (it) {
@@ -99,7 +100,7 @@ var Show = function (opt) {
             })
         },
         visible: function (item) {  // 记录当前可见dom，enter时添加，exit时删除
-            this.enterOrExit(item, {
+            enterOrExit.call(this, item, {
                 enter: function (dom) {
                     this.domsVisiable.push(dom);
                 },
@@ -138,6 +139,10 @@ var Show = function (opt) {
         observer.observe(item);
     });
 
+
+    var stayTimer;
+    // 停留事件，在停止滚动时setTimeout3秒后尝试发送停留事件，
+    // 如果3s内IntersectionObserver状态有改变，则清除此setTimeout
     function stayAction() {
         stayTimer = setTimeout(function () {
 
@@ -156,20 +161,19 @@ var Show = function (opt) {
             me.fireEvent('stay', domsStay);       // stay(滚动停止3s后)
             me.fireEvent('stop-stay', domsVisiable); // stop-stay第二波(滚动停止3s后)的stop-stay事件只发当前可见dom
 
-            domsStay.length = 0;
         }, 3000);
     }
 
-
-    var stayTimer;
-    // 停留事件，在停止滚动时setTimeout3秒后尝试发送停留事件，
-    // 如果3s内IntersectionObserver状态有改变，则清除此setTimeout
-    this.on(['stop', 'init'], function () {
-        debugger;
+    this.on('stop', function() {
         stayAction.call(me);
     });
 
-    // 每次触发后清空
+    // init时初始stop
+    this.on('init', function() {
+        this.fireEvent('stop', domsShow);
+    })
+
+    // 每次触发后清空对应的dom数组
     this.on(['stop', 'stay', 'stop-stay'], function(doms) {
         doms.length = 0;
     });
@@ -177,7 +181,7 @@ var Show = function (opt) {
 
     var begin;
     var fn = debounce(function () {
-        me.fireEvent('stop', domsShow);               // stop时发曝光的dom
+        me.fireEvent('stop', domsShow);           // stop时发曝光的dom
         me.fireEvent('stop-stay', domsStay);      // stop-stay第一波发滚动过程中超过3s的dom
         begin = false;
     }, 500);
@@ -187,12 +191,20 @@ var Show = function (opt) {
         if (!begin) {
             me.fireEvent('begin');
             begin = true;
-            domsShow.length = 0;
             clearTimeout(stayTimer);
         }
 
         fn();
     });
+
+    function enterOrExit(item, cb) {
+        if (item.intersectionRatio > 0.6666666) {
+            cb && cb.enter && cb.enter.call(this, item.target);
+        } else {
+            cb && cb.exit && cb.exit.call(this, item.target);
+        }
+    }
+
 }
 
 
@@ -209,13 +221,6 @@ Show.prototype = {
         });
 
         this.fireEvent('init');
-    },
-    enterOrExit: function (item, cb) {
-        if (item.intersectionRatio > 0.6666666) {
-            cb && cb.enter && cb.enter.call(this, item.target);
-        } else {
-            cb && cb.exit && cb.exit.call(this, item.target);
-        }
     },
     getVisibleDoms: function () {
         return this.domsVisiable;
