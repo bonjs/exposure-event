@@ -50,6 +50,8 @@ var Show = function (opt) {
 
     var doms = document.querySelectorAll(this.selector);    // 要监控的dom
 
+    this.stayTimeout = opt.stayTimeout || 1000; //  停留时长，默认1s
+
     var domsShow = this.domsShow = [];    // 曝光事件使用的数组
     var domsStay = this.domsStay = [];    // 停留事件使用的数组
     var domsVisiable = this.domsVisiable = [];   // 处于可见区域的dom
@@ -161,7 +163,7 @@ var Show = function (opt) {
             me.fireEvent('stay', domsStay);       // stay(滚动停止3s后)
             me.fireEvent('stop-stay', domsVisiable); // stop-stay第二波(滚动停止3s后)的stop-stay事件只发当前可见dom
 
-        }, 3000);
+        }, this.stayTimeout);
     }
 
     this.on('stop', function() {

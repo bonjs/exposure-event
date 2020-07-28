@@ -36,9 +36,9 @@
 </head>
 
 <body>
+    <!--
     <div id=a class="div1">
 
-        <!--
             
             <div class="myDiv">1</div>
             <div class="myDiv">2</div>
@@ -52,10 +52,9 @@
             <div class="myDiv">10</div>
             <div class="myDiv">11</div>
             <div class="myDiv">12</div>
-        -->
+        
     </div>
-
-    </div>
+-->
     <script>
         function debounce(fn, timeout) {
             var timer;
@@ -72,17 +71,13 @@
             var d = document.createElement('div');
             d.setAttribute('class', 'myDiv');
             d.innerHTML = i;
-            a.appendChild(d)
+            document.body.appendChild(d)
         }
 
         var s = new Show({
-            selector: '#a .myDiv',
-            container: a,
-            type: ['stay'],
+            selector: '.myDiv',
+            stayTimeout: 5000,
             listeners: {
-                'init': function(doms) {
-                    console.log('init', out(doms))
-                },
                 'stop-stay': function (doms) {
                     console.log('stop-stay', out(doms))
                 },
@@ -95,8 +90,26 @@
             }
         });
 
+        var s = new Show({
+            selector: '.myDiv',
+            stayTimeout: 1000,
+            listeners: {
+                'stop-stay': function (doms) {
+                    doms.forEach(function(it) {
+                        console.log(it.innerHTML)
+                    })
+                },
+                // stop: function (doms) {
+                //     console.log('stop', out(doms))
+                // },
+                // stay: function (doms) {
+                //     console.log('stay', out(doms))
+                // }
+            }
+        });
+
         function out(doms) {
-            if(!doms) {
+            if (!doms) {
                 return ''
             }
             return doms.map(function (it) {
