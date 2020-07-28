@@ -57,14 +57,14 @@
 
     </div>
     <script>
-        function debounce(fn) {
-            var timeout;
+        function debounce(fn, timeout) {
+            var timer;
             return function () {
                 var me = this;
-                clearTimeout(timeout);
-                timeout = setTimeout(function () {
+                clearTimeout(timer);
+                timer = setTimeout(function () {
                     fn.apply(me, arguments)
-                }, 100);
+                }, 100 || timeout);
             }
         }
 
@@ -80,16 +80,29 @@
             container: a,
             type: ['stay'],
             listeners: {
-                stop: function (doms) {
-                    //console.log('stop', doms)
+                'init': function(doms) {
+                    console.log('init', out(doms))
                 },
-                stay: function (doms) {
-                    console.log('发送停留事件', doms.map(function (it) {
-                        return it.innerHTML;// + ',' + it.accessTime + ', ' + it.leftTime;
-                    }));
-                }
+                'stop-stay': function (doms) {
+                    console.log('stop-stay', out(doms))
+                },
+                // stop: function (doms) {
+                //     console.log('stop', out(doms))
+                // },
+                // stay: function (doms) {
+                //     console.log('stay', out(doms))
+                // }
             }
         });
+
+        function out(doms) {
+            if(!doms) {
+                return ''
+            }
+            return doms.map(function (it) {
+                return it.innerHTML
+            })
+        }
 
 
 
